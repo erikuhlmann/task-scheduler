@@ -50,6 +50,10 @@ namespace UnitTest {
 	HANDLE h1;
 	TEST_CLASS(UnitTest1) {
 	public:
+		void wait() {
+			std::this_thread::sleep_for(std::chrono::milliseconds(TaskScheduler::TICK_SPEED * 10));
+		}
+
 		TEST_CLASS_INITIALIZE(UnitTest1Init) {
 			h1 = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)SchedulerLoop, 0, 0, &threadID1);
 		}
@@ -61,10 +65,10 @@ namespace UnitTest {
 			TaskScheduler::GetInstance().AddTask(t2);
 			t1->SetEnabled(true);
 			t2->SetEnabled(true);
-			std::this_thread::sleep_for(std::chrono::seconds(1));
+			wait();
 			TaskScheduler::GetInstance().RemoveTask(t1);
 			TaskScheduler::GetInstance().RemoveTask(t2);
-			std::this_thread::sleep_for(std::chrono::seconds(1));
+			wait();
 			Assert::IsTrue(TaskScheduler::GetInstance().m_tasks.size() == 0);
 		}
 
@@ -75,7 +79,8 @@ namespace UnitTest {
 			TaskScheduler::GetInstance().AddTask(t2);
 			t1->SetEnabled(true);
 			t2->SetEnabled(true);
-			std::this_thread::sleep_for(std::chrono::seconds(1));
+			wait();
+			// only one should be enabled
 			Assert::IsTrue(t1->IsEnabled() ^ t2->IsEnabled());
 		}
 
@@ -83,15 +88,40 @@ namespace UnitTest {
 			std::shared_ptr<TestTask> t1(new TestTask());
 			TaskScheduler::GetInstance().AddTask(t1);
 			t1->SetEnabled(true);
-			std::this_thread::sleep_for(std::chrono::seconds(1));
+			wait();
 			Assert::IsTrue(t1->m_enableCount == 1);
 			t1->SetEnabled(false);
-			std::this_thread::sleep_for(std::chrono::seconds(1));
+			wait();
 			Assert::IsTrue(t1->m_disableCount == 1);
 			Assert::IsTrue(t1->m_runCount > 0);
 		}
 
-		// add some more test here
+		TEST_METHOD(EnableRemoveTest) {
+			std::shared_ptr<TestTask> t1(new TestTask());
+			TaskScheduler::GetInstance().AddTask(t1);
+			t1->SetEnabled(true);
+			wait();
+			TaskScheduler::GetInstance().RemoveTask(t1);
+			wait();
+			Assert::IsFalse(t1->IsEnabled());
+			Assert::IsTrue(t1->m_disableCount == 1);
+			Assert::IsTrue(TaskScheduler::GetInstance().m_tasks.size() == 0);
+		}
+
+		TEST_METHOD(MultipleEnableDisableTest) {
+			std::shared_ptr<TestTask> t1(new TestTask());
+			TaskScheduler::GetInstance().AddTask(t1);
+			for (int i = 0; i < 10; i++) {
+				t1->SetEnabled(true);
+				wait();
+			}
+			Assert::IsTrue(t1->m_enableCount == 1);
+			for (int i = 0; i < 10; i++) {
+				t1->SetEnabled(false);
+				wait();
+			}
+			Assert::IsTrue(t1->m_disableCount == 1);
+		}
 
 		TEST_METHOD_CLEANUP(UnitTest1Reset) {
 			std::lock_guard<std::mutex> guard(TaskScheduler::GetInstance().lock);

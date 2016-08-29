@@ -23,10 +23,10 @@ namespace lb {
 		std::unordered_set<int> m_usedResources;
 		std::vector<std::shared_ptr<Task>> m_removeTasks;
 
-		static constexpr int TICK_SPEED = 1000 / 50; // ms
-
 		bool CheckTask(std::shared_ptr<Task>& task);
 	public:
+		static constexpr int TICK_SPEED = 1000 / 50; // ms
+
 		TaskScheduler();
 		virtual ~TaskScheduler();
 		void Loop();

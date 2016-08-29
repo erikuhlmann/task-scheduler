@@ -15,11 +15,12 @@ TaskScheduler::TaskScheduler() : m_running(false), m_ticks(0) {
 }
 
 void TaskScheduler::Loop() {
-	auto start = std::chrono::high_resolution_clock::now();
 	m_running = true;
 	while (m_running) {
-		start = std::chrono::high_resolution_clock::now();
+		auto start = std::chrono::high_resolution_clock::now();
 		lock.lock();
+
+		// enable all tasks queued to be enabled
 		for (auto it = m_tasks.begin(); it != m_tasks.end(); ++it) {
 			std::shared_ptr<Task>& task = it->second;
 			if (task->m_enabled && !task->m_startHandlerRun) {
@@ -36,9 +37,20 @@ void TaskScheduler::Loop() {
 					task->m_endHandlerRun = true;
 				}
 			}
+		}
+
+		// run enabled tasks
+		for (auto it = m_tasks.begin(); it != m_tasks.end(); ++it) {
+			std::shared_ptr<Task>& task = it->second;
+
 			if (task->m_enabled && m_ticks % task->m_tickInterval == 0) {
 				task->Run();
 			}
+		}
+
+		// disable tasks queued to be disabled
+		for (auto it = m_tasks.begin(); it != m_tasks.end(); ++it) {
+			std::shared_ptr<Task>& task = it->second;
 			if (!task->m_enabled && !task->m_endHandlerRun) {
 				task->OnDisable();
 				task->m_endHandlerRun = true;
@@ -48,10 +60,12 @@ void TaskScheduler::Loop() {
 			}
 		}
 
+		// remove tasks queued to be removed
 		for (auto it = m_removeTasks.begin(); it != m_removeTasks.end(); it++) {
 			m_tasks.erase((*it)->m_id);
 		}
 		m_removeTasks.erase(m_removeTasks.begin(), m_removeTasks.end());
+
 		lock.unlock();
 		m_ticks++;
 		std::this_thread::sleep_until(start + std::chrono::milliseconds(TICK_SPEED));
@@ -65,6 +79,7 @@ void TaskScheduler::AddTask(std::shared_ptr<Task> task) {
 
 void TaskScheduler::RemoveTask(std::shared_ptr<Task> task) {
 	std::lock_guard<std::mutex> guard(lock);
+	// task must be queued to ensure the OnDisable function runs
 	task->SetEnabled(false);
 	m_removeTasks.push_back(task);
 }
